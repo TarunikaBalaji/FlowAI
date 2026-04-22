@@ -1,0 +1,2100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FlowAI — Your Second Brain for Getting Things Done</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { getFirestore, collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, query, where, serverTimestamp, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+  const firebaseConfig = {
+  authDomain: "flowai-85819.firebaseapp.com",
+  projectId: "flowai-85819",
+  storageBucket: "flowai-85819.firebasestorage.app",
+  messagingSenderId: "106436228",
+  appId: "1:106436228:web:450e73b0c80759b40dd4d1",
+  measurementId: "G-4EN9YJ1Q6D"
+};
+
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  window._firebase = { auth, db, collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, query, where, serverTimestamp, orderBy, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged };
+</script>
+
+<style>
+/* ─────────────────────────────────────────── RESET & VARS */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #030712;
+  --bg-2:      #060d1f;
+  --surface:   rgba(255,255,255,0.035);
+  --surface-2: rgba(255,255,255,0.06);
+  --border:    rgba(255,255,255,0.07);
+  --border-2:  rgba(255,255,255,0.12);
+  --cyan:      #00f0ff;
+  --violet:    #a855f7;
+  --rose:      #f43f5e;
+  --green:     #10b981;
+  --amber:     #f59e0b;
+  --text:      #f1f5f9;
+  --muted:     #64748b;
+  --font-disp: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --r:         16px;
+  --r-lg:      24px;
+  --ease:      cubic-bezier(0.16, 1, 0.3, 1);
+  --sidebar-w: 240px;
+  --chat-w:    320px;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 2px; }
+::selection { background: rgba(168,85,247,0.3); color:#fff; }
+
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+
+/* ─── UTILS */
+.container { width: 92%; max-width: 1200px; margin: 0 auto; }
+.gradient-text {
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--violet) 50%, var(--rose) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.25);
+  color: var(--violet); font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 100px;
+}
+.tag::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--cyan); display:block; animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+
+/* ─── BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 22px; border-radius: 10px;
+  font-size: 14px; font-weight: 500; font-family: var(--font-body);
+  cursor: pointer; transition: all 0.25s var(--ease);
+  text-decoration: none; border: none; position: relative; overflow: hidden;
+}
+.btn::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 0%,rgba(255,255,255,0.15),transparent 70%); opacity:0; transition:opacity 0.3s; }
+.btn:hover::after { opacity:1; }
+.btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-ghost:hover { color:var(--text); border-color:rgba(255,255,255,0.15); background:var(--surface); }
+.btn-primary { background:linear-gradient(135deg,var(--violet) 0%,#6d28d9 100%); color:#fff; box-shadow:0 0 24px rgba(168,85,247,0.35),inset 0 1px 0 rgba(255,255,255,0.15); }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 32px rgba(168,85,247,0.5),inset 0 1px 0 rgba(255,255,255,0.15); }
+.btn-cyan { background:linear-gradient(135deg,rgba(0,240,255,0.15),rgba(0,240,255,0.05)); border:1px solid rgba(0,240,255,0.3); color:var(--cyan); }
+.btn-cyan:hover { background:rgba(0,240,255,0.12); box-shadow:0 0 24px rgba(0,240,255,0.2); transform:translateY(-1px); }
+.btn-lg { padding:14px 32px; font-size:15px; border-radius:12px; }
+.btn-sm { padding:7px 14px; font-size:12px; border-radius:8px; }
+.btn-danger { background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.25); color:var(--rose); }
+.btn-danger:hover { background:rgba(244,63,94,0.2); }
+
+/* ════════════════════════════════════════
+   LANDING PAGE STYLES
+════════════════════════════════════════ */
+
+/* ─── NAV */
+#nav {
+  position: fixed; top:0; left:0; right:0; z-index:900;
+  padding: 20px 0; transition: all 0.4s var(--ease);
+}
+#nav.scrolled {
+  background: rgba(3,7,18,0.85); backdrop-filter:blur(24px) saturate(1.5);
+  border-bottom: 1px solid var(--border); padding:14px 0;
+}
+.nav-inner { display:flex; align-items:center; justify-content:space-between; }
+.logo {
+  font-family:var(--font-disp); font-size:22px; font-weight:800; letter-spacing:-0.02em;
+  display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text);
+}
+.logo-icon {
+  width:32px; height:32px;
+  background:linear-gradient(135deg,var(--cyan),var(--violet));
+  border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+.nav-links { display:flex; gap:36px; list-style:none; }
+.nav-links a {
+  color:var(--muted); font-size:14px; font-weight:500;
+  text-decoration:none; transition:color 0.2s; position:relative;
+}
+.nav-links a::after { content:''; position:absolute; bottom:-4px; left:0; right:0; height:1px; background:var(--cyan); transform:scaleX(0); transform-origin:left; transition:transform 0.3s var(--ease); }
+.nav-links a:hover { color:var(--text); }
+.nav-links a:hover::after { transform:scaleX(1); }
+.nav-cta { display:flex; gap:12px; align-items:center; }
+
+/* ─── HERO */
+#hero {
+  min-height:100vh; display:flex; align-items:center;
+  padding-top:100px; padding-bottom:60px;
+  position:relative; overflow:hidden;
+}
+#canvas-container { position:absolute; inset:0; z-index:0; }
+.hero-grid-bg {
+  position:absolute; inset:0; z-index:1;
+  background-image: linear-gradient(rgba(0,240,255,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(0,240,255,0.03) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 70%);
+}
+.hero-glow-1 { position:absolute; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%); top:-100px; right:-100px; z-index:1; pointer-events:none; }
+.hero-glow-2 { position:absolute; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle,rgba(0,240,255,0.08) 0%,transparent 70%); bottom:100px; left:-100px; z-index:1; pointer-events:none; }
+.hero-inner { display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; position:relative; z-index:2; }
+.hero-tag { margin-bottom:28px; }
+.hero-h1 {
+  font-family:var(--font-disp); font-size:clamp(40px,5.5vw,72px);
+  font-weight:800; line-height:1.05; letter-spacing:-0.03em; margin-bottom:24px;
+}
+.hero-h1 .line-2 { display:block; }
+.hero-sub { font-size:17px; color:var(--muted); font-weight:300; max-width:440px; line-height:1.8; margin-bottom:40px; }
+.hero-sub strong { color:#cbd5e1; font-weight:400; }
+.hero-actions { display:flex; gap:14px; flex-wrap:wrap; }
+.hero-stats { display:flex; gap:32px; margin-top:52px; padding-top:32px; border-top:1px solid var(--border); }
+.stat-num { font-family:var(--font-disp); font-size:28px; font-weight:800; background:linear-gradient(135deg,var(--text) 0%,var(--muted) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-label { font-size:12px; color:var(--muted); margin-top:2px; font-family:var(--font-mono); letter-spacing:0.06em; }
+
+.hero-3d { position:relative; height:520px; display:flex; align-items:center; justify-content:center; }
+#three-canvas { position:absolute; inset:0; width:100%; height:100%; border-radius:24px; }
+.hero-3d-ring { position:absolute; width:320px; height:320px; border-radius:50%; border:1px solid rgba(0,240,255,0.12); animation:spin-slow 20s linear infinite; }
+.hero-3d-ring-2 { position:absolute; width:420px; height:420px; border-radius:50%; border:1px solid rgba(168,85,247,0.08); animation:spin-slow 30s linear infinite reverse; }
+@keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.hero-badge {
+  position:absolute; bottom:40px; right:20px;
+  background:rgba(255,255,255,0.04); backdrop-filter:blur(20px);
+  border:1px solid var(--border); border-radius:12px;
+  padding:12px 16px; display:flex; align-items:center; gap:10px;
+  font-size:12px; color:var(--muted); animation:float 4s ease-in-out infinite;
+}
+.hero-badge .dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); flex-shrink:0; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+
+/* ─── LOGOS MARQUEE */
+#logos { padding:40px 0 60px; position:relative; z-index:2; border-top:1px solid var(--border); }
+.logos-label { text-align:center; font-size:12px; color:var(--muted); font-family:var(--font-mono); letter-spacing:0.14em; text-transform:uppercase; margin-bottom:28px; }
+.marquee-wrapper { overflow:hidden; position:relative; }
+.marquee-wrapper::before,.marquee-wrapper::after { content:''; position:absolute; top:0; bottom:0; width:120px; z-index:2; pointer-events:none; }
+.marquee-wrapper::before { left:0; background:linear-gradient(to right,var(--bg),transparent); }
+.marquee-wrapper::after { right:0; background:linear-gradient(to left,var(--bg),transparent); }
+.marquee-track { display:flex; gap:60px; width:max-content; animation:marquee 22s linear infinite; }
+.marquee-item { font-family:var(--font-disp); font-size:18px; font-weight:700; color:rgba(100,116,139,0.4); white-space:nowrap; letter-spacing:-0.02em; transition:color 0.3s; }
+.marquee-item:hover { color:var(--muted); }
+@keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* ─── FEATURES */
+#features { padding:120px 0; }
+.features-header { max-width:600px; margin:0 auto 72px; text-align:center; }
+.section-h2 { font-family:var(--font-disp); font-size:clamp(32px,4vw,52px); font-weight:800; line-height:1.1; letter-spacing:-0.03em; margin-bottom:16px; }
+.section-sub { color:var(--muted); font-size:16px; font-weight:300; line-height:1.8; }
+.section-label { font-family:var(--font-mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+.features-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:20px; }
+.features-grid .card-wide { grid-column:span 2; }
+.feat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg);
+  padding:36px; position:relative; overflow:hidden; cursor:default;
+  transition:transform 0.4s var(--ease),border-color 0.3s,box-shadow 0.4s;
+}
+.feat-card::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(168,85,247,0.06) 0%,transparent 60%); opacity:0; transition:opacity 0.4s; }
+.feat-card:hover { transform:translateY(-4px); border-color:rgba(168,85,247,0.2); box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+.feat-card:hover::before { opacity:1; }
+.feat-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; margin-bottom:20px; }
+.icon-cyan   { color:var(--cyan);   background:rgba(0,240,255,0.08);   border:1px solid rgba(0,240,255,0.15); }
+.icon-violet { color:var(--violet); background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.15); }
+.icon-rose   { color:var(--rose);   background:rgba(244,63,94,0.08);   border:1px solid rgba(244,63,94,0.15); }
+.icon-green  { color:var(--green);  background:rgba(16,185,129,0.08);  border:1px solid rgba(16,185,129,0.15); }
+.feat-title { font-family:var(--font-disp); font-size:20px; font-weight:700; letter-spacing:-0.02em; margin-bottom:10px; }
+.feat-body { color:var(--muted); font-size:14px; line-height:1.75; font-weight:300; }
+
+/* ─── PRICING */
+#pricing { padding:120px 0; }
+.pricing-header { text-align:center; margin-bottom:64px; }
+.pricing-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; align-items:start; }
+.price-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:36px; position:relative; transition:transform 0.4s var(--ease),box-shadow 0.4s; }
+.price-card:hover { transform:translateY(-6px); box-shadow:0 30px 80px rgba(0,0,0,0.4); }
+.price-card.popular { background:linear-gradient(135deg,rgba(168,85,247,0.08) 0%,rgba(0,240,255,0.04) 100%); border-color:rgba(168,85,247,0.35); box-shadow:0 0 0 1px rgba(168,85,247,0.1),0 20px 60px rgba(168,85,247,0.1); }
+.popular-badge { position:absolute; top:-14px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,var(--violet),#6d28d9); color:#fff; font-size:11px; font-family:var(--font-mono); letter-spacing:0.1em; text-transform:uppercase; padding:5px 16px; border-radius:100px; white-space:nowrap; }
+.price-tier { font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+.price-amount { display:flex; align-items:flex-start; gap:4px; margin-bottom:8px; }
+.price-dollar { font-size:20px; color:var(--muted); padding-top:8px; font-family:var(--font-disp); }
+.price-num { font-family:var(--font-disp); font-size:56px; font-weight:800; line-height:1; letter-spacing:-0.04em; }
+.price-period { font-size:13px; color:var(--muted); align-self:flex-end; padding-bottom:8px; }
+.price-desc { font-size:13px; color:var(--muted); margin-bottom:28px; line-height:1.6; }
+.price-features { list-style:none; margin-bottom:32px; }
+.price-features li { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:#94a3b8; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.03); }
+.price-features li:last-child { border-bottom:none; }
+.check { color:var(--green); font-size:14px; flex-shrink:0; margin-top:1px; }
+.cross { color:var(--muted); font-size:14px; flex-shrink:0; margin-top:1px; opacity:0.4; }
+
+/* ─── CTA */
+#cta { padding:120px 0; position:relative; overflow:hidden; }
+.cta-bg { position:absolute; inset:0; background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(168,85,247,0.08) 0%,transparent 70%); }
+.cta-ring { position:absolute; border-radius:50%; border:1px solid rgba(168,85,247,0.08); }
+.cta-ring-1 { width:400px; height:400px; top:50%; left:50%; transform:translate(-50%,-50%); animation:spin-slow 25s linear infinite; }
+.cta-ring-2 { width:600px; height:600px; top:50%; left:50%; transform:translate(-50%,-50%); animation:spin-slow 40s linear infinite reverse; }
+.cta-inner { position:relative; z-index:2; text-align:center; max-width:600px; margin:0 auto; }
+.cta-h2 { font-family:var(--font-disp); font-size:clamp(36px,5vw,62px); font-weight:800; line-height:1.08; letter-spacing:-0.03em; margin-bottom:20px; }
+.cta-sub { color:var(--muted); font-size:17px; font-weight:300; line-height:1.8; margin-bottom:40px; }
+.cta-actions { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+.cta-note { margin-top:16px; font-size:12px; color:var(--muted); font-family:var(--font-mono); }
+
+/* ─── FOOTER */
+#footer { padding:60px 0 40px; border-top:1px solid var(--border); }
+.footer-inner { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:60px; margin-bottom:60px; }
+.footer-brand-name { font-family:var(--font-disp); font-size:20px; font-weight:800; letter-spacing:-0.02em; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+.footer-brand-desc { font-size:13px; color:var(--muted); line-height:1.8; font-weight:300; max-width:280px; }
+.footer-col-title { font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }
+.footer-links { list-style:none; }
+.footer-links li { margin-bottom:10px; }
+.footer-links a { color:#475569; font-size:13px; text-decoration:none; transition:color 0.2s; }
+.footer-links a:hover { color:var(--text); }
+.footer-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:28px; border-top:1px solid var(--border); }
+.footer-copy { font-size:12px; color:var(--muted); font-family:var(--font-mono); }
+
+/* ════════════════════════════════════════
+   AUTH OVERLAY
+════════════════════════════════════════ */
+#auth-overlay {
+  position:fixed; inset:0; z-index:10000;
+  background:rgba(3,7,18,0.95); backdrop-filter:blur(24px);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity 0.4s;
+}
+#auth-overlay.visible { opacity:1; pointer-events:all; }
+
+.auth-modal {
+  background:rgba(6,13,31,0.9); border:1px solid var(--border-2);
+  border-radius:24px; padding:48px; width:100%; max-width:440px;
+  box-shadow:0 40px 120px rgba(0,0,0,0.6),0 0 0 1px rgba(168,85,247,0.1);
+  position:relative;
+}
+.auth-logo { display:flex; align-items:center; gap:10px; margin-bottom:32px; }
+.auth-logo-icon { width:36px; height:36px; background:linear-gradient(135deg,var(--cyan),var(--violet)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+.auth-logo-name { font-family:var(--font-disp); font-size:20px; font-weight:800; }
+.auth-title { font-family:var(--font-disp); font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; }
+.auth-sub { font-size:14px; color:var(--muted); margin-bottom:32px; }
+
+.auth-tabs { display:flex; gap:0; margin-bottom:28px; background:var(--surface); border-radius:10px; padding:4px; }
+.auth-tab {
+  flex:1; padding:8px; text-align:center; font-size:13px; font-weight:500;
+  color:var(--muted); cursor:pointer; border-radius:8px; transition:all 0.2s;
+}
+.auth-tab.active { background:rgba(168,85,247,0.15); color:var(--violet); border:1px solid rgba(168,85,247,0.25); }
+
+.auth-form { display:flex; flex-direction:column; gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-label { font-size:12px; font-family:var(--font-mono); color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; }
+.form-input {
+  background:rgba(255,255,255,0.04); border:1px solid var(--border-2);
+  border-radius:10px; padding:12px 16px;
+  font-size:14px; color:var(--text); font-family:var(--font-body);
+  transition:border-color 0.2s,box-shadow 0.2s; outline:none; width:100%;
+}
+.form-input:focus { border-color:rgba(168,85,247,0.5); box-shadow:0 0 0 3px rgba(168,85,247,0.1); }
+.form-input::placeholder { color:var(--muted); }
+
+.auth-error { background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.25); border-radius:8px; padding:10px 14px; font-size:13px; color:var(--rose); display:none; }
+.auth-error.show { display:block; }
+
+.auth-submit { margin-top:8px; width:100%; justify-content:center; padding:14px; font-size:15px; border-radius:12px; }
+.auth-close { position:absolute; top:20px; right:20px; background:var(--surface); border:1px solid var(--border); border-radius:8px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); font-size:16px; transition:all 0.2s; }
+.auth-close:hover { color:var(--text); border-color:var(--border-2); }
+
+/* ════════════════════════════════════════
+   APP SHELL (Dashboard)
+════════════════════════════════════════ */
+#app-shell {
+  display:none; position:fixed; inset:0; z-index:8000;
+  background:var(--bg); flex-direction:column;
+}
+#app-shell.visible { display:flex; }
+
+/* ─── APP TOP BAR */
+.app-topbar {
+  height:56px; min-height:56px;
+  background:rgba(6,13,31,0.9); backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px; gap:16px; z-index:100;
+}
+.app-topbar-left { display:flex; align-items:center; gap:16px; }
+.app-logo { font-family:var(--font-disp); font-size:18px; font-weight:800; letter-spacing:-0.02em; display:flex; align-items:center; gap:8px; }
+.app-logo-icon { width:28px; height:28px; background:linear-gradient(135deg,var(--cyan),var(--violet)); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+
+.app-topbar-center { flex:1; max-width:360px; }
+.app-search {
+  width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border);
+  border-radius:8px; padding:8px 14px; font-size:13px; color:var(--text);
+  font-family:var(--font-body); outline:none; transition:border-color 0.2s;
+}
+.app-search:focus { border-color:rgba(168,85,247,0.4); }
+.app-search::placeholder { color:var(--muted); }
+
+.app-topbar-right { display:flex; align-items:center; gap:12px; }
+.app-user-badge {
+  display:flex; align-items:center; gap:10px; padding:6px 12px;
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  font-size:13px; cursor:pointer; transition:all 0.2s;
+}
+.app-user-badge:hover { border-color:var(--border-2); }
+.app-avatar { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--violet),var(--cyan)); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; font-family:var(--font-disp); }
+
+/* ─── APP BODY */
+.app-body {
+  display:flex; flex:1; overflow:hidden;
+}
+
+/* ─── SIDEBAR */
+.app-sidebar {
+  width:var(--sidebar-w); min-width:var(--sidebar-w);
+  background:rgba(6,13,31,0.7); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+  transition:width 0.3s var(--ease);
+}
+.sidebar-logo-section { padding:20px 16px 12px; border-bottom:1px solid var(--border); }
+.sidebar-workspace { font-family:var(--font-disp); font-size:14px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+.workspace-icon { width:24px; height:24px; background:linear-gradient(135deg,var(--violet),var(--cyan)); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; }
+
+.sidebar-nav { flex:1; overflow-y:auto; padding:12px 0; }
+.sidebar-section-label { font-family:var(--font-mono); font-size:9px; color:var(--muted); letter-spacing:0.14em; text-transform:uppercase; padding:0 20px; margin:16px 0 6px; }
+.sidebar-item {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 20px; font-size:13px; color:var(--muted);
+  cursor:pointer; transition:all 0.2s; position:relative;
+  border-left:2px solid transparent;
+}
+.sidebar-item:hover { color:var(--text); background:rgba(255,255,255,0.03); }
+.sidebar-item.active { color:var(--violet); background:rgba(168,85,247,0.08); border-left-color:var(--violet); }
+.sidebar-item-icon { font-size:16px; width:20px; text-align:center; flex-shrink:0; }
+.sidebar-item-count { margin-left:auto; font-family:var(--font-mono); font-size:10px; background:rgba(168,85,247,0.15); color:var(--violet); padding:1px 6px; border-radius:4px; }
+
+.sidebar-footer { padding:16px; border-top:1px solid var(--border); }
+.sidebar-user { display:flex; align-items:center; gap:10px; padding:10px; background:var(--surface); border-radius:10px; border:1px solid var(--border); }
+.sidebar-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--violet),var(--cyan)); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; font-family:var(--font-disp); flex-shrink:0; }
+.sidebar-user-info { flex:1; min-width:0; }
+.sidebar-user-name { font-size:12px; font-weight:600; font-family:var(--font-disp); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-user-email { font-size:10px; color:var(--muted); font-family:var(--font-mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sidebar-logout { width:28px; height:28px; background:none; border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all 0.2s; flex-shrink:0; }
+.sidebar-logout:hover { color:var(--rose); border-color:rgba(244,63,94,0.3); }
+
+/* ─── MAIN CONTENT */
+.app-main {
+  flex:1; overflow-y:auto; display:flex; flex-direction:column;
+}
+
+/* VIEWS */
+.app-view { display:none; flex:1; flex-direction:column; padding:28px; }
+.app-view.active { display:flex; }
+
+/* Dashboard View */
+.view-header { margin-bottom:28px; }
+.view-title { font-family:var(--font-disp); font-size:24px; font-weight:800; letter-spacing:-0.02em; }
+.view-subtitle { font-size:13px; color:var(--muted); margin-top:4px; }
+
+.dashboard-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.dash-stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:20px; transition:transform 0.3s,border-color 0.3s;
+}
+.dash-stat-card:hover { transform:translateY(-2px); border-color:var(--border-2); }
+.dash-stat-label { font-size:11px; font-family:var(--font-mono); color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+.dash-stat-value { font-family:var(--font-disp); font-size:28px; font-weight:800; letter-spacing:-0.02em; }
+.dash-stat-delta { font-size:11px; color:var(--green); margin-top:4px; }
+
+.dashboard-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+.dash-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; }
+.dash-card-title { font-family:var(--font-disp); font-size:14px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+.dash-card-title span { font-size:11px; font-family:var(--font-mono); color:var(--muted); font-weight:400; }
+
+.activity-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.03); }
+.activity-item:last-child { border-bottom:none; }
+.activity-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:6px; }
+.activity-text { font-size:12px; color:#94a3b8; line-height:1.5; }
+.activity-time { font-size:10px; font-family:var(--font-mono); color:var(--muted); margin-top:2px; }
+
+/* ─── TASK BOARD */
+.board-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+.board-actions { display:flex; gap:10px; }
+
+.task-board { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; flex:1; }
+.task-column {
+  background:rgba(255,255,255,0.025); border:1px solid var(--border);
+  border-radius:14px; padding:16px; display:flex; flex-direction:column;
+  min-height:400px; transition:border-color 0.2s;
+}
+.task-column.drag-over { border-color:rgba(168,85,247,0.4); background:rgba(168,85,247,0.04); }
+
+.col-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.col-title-row { display:flex; align-items:center; gap:8px; }
+.col-dot { width:8px; height:8px; border-radius:50%; }
+.col-title { font-family:var(--font-disp); font-size:13px; font-weight:700; }
+.col-count { font-family:var(--font-mono); font-size:10px; background:var(--surface-2); border:1px solid var(--border); padding:1px 7px; border-radius:4px; color:var(--muted); }
+.col-add-btn { width:24px; height:24px; border-radius:6px; background:var(--surface); border:1px solid var(--border); color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; line-height:1; transition:all 0.2s; }
+.col-add-btn:hover { color:var(--text); border-color:var(--border-2); background:var(--surface-2); }
+
+.task-list { flex:1; display:flex; flex-direction:column; gap:8px; min-height:60px; }
+
+.task-card {
+  background:rgba(6,13,31,0.8); border:1px solid var(--border);
+  border-radius:10px; padding:14px; cursor:grab;
+  transition:transform 0.2s,border-color 0.2s,box-shadow 0.2s;
+  position:relative;
+}
+.task-card:hover { transform:translateY(-2px); border-color:var(--border-2); box-shadow:0 8px 24px rgba(0,0,0,0.3); }
+.task-card.dragging { opacity:0.5; transform:rotate(2deg) scale(0.98); cursor:grabbing; box-shadow:0 16px 48px rgba(0,0,0,0.5); }
+.task-card-title { font-size:13px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:10px; }
+.task-card-meta { display:flex; align-items:center; justify-content:space-between; }
+.task-priority { display:flex; align-items:center; gap:4px; font-size:10px; font-family:var(--font-mono); padding:2px 8px; border-radius:4px; }
+.priority-high   { background:rgba(244,63,94,0.1);   color:var(--rose);   border:1px solid rgba(244,63,94,0.2); }
+.priority-medium { background:rgba(245,158,11,0.1);  color:var(--amber);  border:1px solid rgba(245,158,11,0.2); }
+.priority-low    { background:rgba(16,185,129,0.1);  color:var(--green);  border:1px solid rgba(16,185,129,0.2); }
+.task-delete { position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:4px; background:none; border:none; color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; opacity:0; transition:all 0.2s; }
+.task-card:hover .task-delete { opacity:1; }
+.task-delete:hover { color:var(--rose); background:rgba(244,63,94,0.1); }
+
+.add-task-form {
+  background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.1);
+  border-radius:10px; padding:12px; margin-top:8px; display:none;
+}
+.add-task-form.show { display:block; }
+.add-task-input {
+  width:100%; background:transparent; border:none; outline:none;
+  font-size:13px; color:var(--text); font-family:var(--font-body);
+  resize:none; min-height:60px; line-height:1.5;
+}
+.add-task-input::placeholder { color:var(--muted); }
+.add-task-actions { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.priority-select {
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:4px 8px; font-size:11px; color:var(--muted); font-family:var(--font-mono);
+  outline:none; cursor:pointer;
+}
+.task-empty-state { display:flex; align-items:center; justify-content:center; flex:1; min-height:80px; }
+.task-empty-text { font-size:12px; color:rgba(100,116,139,0.5); font-family:var(--font-mono); text-align:center; }
+
+/* ─── AI CHAT PANEL */
+.app-chat-panel {
+  width:var(--chat-w); min-width:var(--chat-w);
+  background:rgba(6,13,31,0.7); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.chat-header {
+  padding:16px 20px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.chat-header-info { display:flex; align-items:center; gap:10px; }
+.chat-ai-avatar {
+  width:32px; height:32px; border-radius:10px;
+  background:linear-gradient(135deg,var(--violet),var(--cyan));
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+.chat-ai-name { font-family:var(--font-disp); font-size:13px; font-weight:700; }
+.chat-ai-status { font-size:10px; color:var(--green); font-family:var(--font-mono); display:flex; align-items:center; gap:4px; }
+.chat-ai-status::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); display:inline-block; }
+.chat-toggle { width:28px; height:28px; background:var(--surface); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all 0.2s; }
+.chat-toggle:hover { color:var(--text); }
+
+.chat-messages {
+  flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;
+}
+.chat-message { display:flex; gap:8px; align-items:flex-start; }
+.chat-message.user { flex-direction:row-reverse; }
+.msg-avatar {
+  width:28px; height:28px; border-radius:8px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:13px;
+}
+.msg-avatar.ai { background:linear-gradient(135deg,var(--violet),var(--cyan)); }
+.msg-avatar.user { background:linear-gradient(135deg,var(--rose),var(--violet)); font-weight:700; font-family:var(--font-disp); }
+.msg-bubble {
+  max-width:220px; padding:10px 12px; border-radius:12px;
+  font-size:12px; line-height:1.6; color:var(--text);
+}
+.msg-bubble.ai { background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.15); border-radius:4px 12px 12px 12px; }
+.msg-bubble.user { background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.15); border-radius:12px 4px 12px 12px; }
+
+.chat-typing { display:none; align-items:flex-start; gap:8px; }
+.chat-typing.visible { display:flex; }
+.typing-dots { display:flex; gap:3px; padding:12px 14px; background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.15); border-radius:4px 12px 12px 12px; }
+.typing-dot { width:5px; height:5px; border-radius:50%; background:var(--violet); animation:typing-bounce 1.2s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay:0.2s; }
+.typing-dot:nth-child(3) { animation-delay:0.4s; }
+@keyframes typing-bounce { 0%,80%,100%{transform:translateY(0);opacity:0.4} 40%{transform:translateY(-6px);opacity:1} }
+
+.chat-input-area { padding:12px; border-top:1px solid var(--border); }
+.chat-input-row { display:flex; gap:8px; align-items:flex-end; }
+.chat-textarea {
+  flex:1; background:rgba(255,255,255,0.04); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px; font-size:12px; color:var(--text);
+  font-family:var(--font-body); outline:none; resize:none; max-height:100px;
+  min-height:38px; transition:border-color 0.2s; line-height:1.5;
+}
+.chat-textarea:focus { border-color:rgba(168,85,247,0.4); }
+.chat-textarea::placeholder { color:var(--muted); }
+.chat-send {
+  width:36px; height:36px; border-radius:10px;
+  background:linear-gradient(135deg,var(--violet),#6d28d9);
+  border:none; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:15px; transition:all 0.2s; flex-shrink:0;
+}
+.chat-send:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(168,85,247,0.4); }
+.chat-send:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+.chat-hint { font-size:10px; color:var(--muted); font-family:var(--font-mono); margin-top:6px; text-align:center; }
+
+/* ─── LOADING STATES */
+.loading-spinner {
+  width:16px; height:16px; border-radius:50%;
+  border:2px solid rgba(255,255,255,0.1);
+  border-top-color:var(--violet);
+  animation:spin 0.8s linear infinite; display:inline-block;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.skeleton {
+  background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%);
+  background-size:200% 100%;
+  animation:skeleton-shimmer 1.5s infinite; border-radius:6px;
+}
+@keyframes skeleton-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ─── TOAST */
+.toast-container { position:fixed; bottom:24px; right:24px; z-index:20000; display:flex; flex-direction:column; gap:8px; }
+.toast {
+  background:rgba(6,13,31,0.95); backdrop-filter:blur(20px);
+  border-radius:12px; padding:12px 16px;
+  font-size:13px; color:var(--text); display:flex; align-items:center; gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid var(--border-2);
+  transform:translateX(100px); opacity:0; transition:all 0.3s var(--ease); min-width:240px;
+}
+.toast.show { transform:translateX(0); opacity:1; }
+.toast-icon { font-size:16px; }
+.toast.success { border-color:rgba(16,185,129,0.3); }
+.toast.error { border-color:rgba(244,63,94,0.3); }
+
+/* ─── OPENAI KEY MODAL */
+#key-modal {
+  position:fixed; inset:0; z-index:15000;
+  background:rgba(3,7,18,0.9); backdrop-filter:blur(20px);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity 0.3s;
+}
+#key-modal.visible { opacity:1; pointer-events:all; }
+.key-modal-inner {
+  background:rgba(6,13,31,0.95); border:1px solid var(--border-2); border-radius:20px;
+  padding:36px; max-width:400px; width:100%;
+  box-shadow:0 40px 80px rgba(0,0,0,0.5);
+}
+.key-modal-title { font-family:var(--font-disp); font-size:20px; font-weight:800; margin-bottom:8px; }
+.key-modal-sub { font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.6; }
+.key-modal-note { font-size:11px; color:var(--muted); margin-top:10px; font-family:var(--font-mono); padding:8px 10px; background:rgba(255,255,255,0.03); border-radius:6px; }
+
+/* ─── RESPONSIVE */
+@media (max-width:900px) {
+  .hero-inner { grid-template-columns:1fr; }
+  .hero-3d { display:none; }
+  .task-board { grid-template-columns:1fr; }
+  .app-chat-panel { display:none; }
+  .dashboard-grid { grid-template-columns:repeat(2,1fr); }
+  .pricing-grid { grid-template-columns:1fr; }
+  .testimonials-grid { grid-template-columns:1fr; }
+  .footer-inner { grid-template-columns:1fr 1fr; gap:40px; }
+}
+@media (max-width:640px) {
+  .app-sidebar { display:none; }
+  .dashboard-grid { grid-template-columns:1fr; }
+  .nav-links { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     TOAST CONTAINER
+════════════════════════════════════════ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ════════════════════════════════════════
+     AUTH OVERLAY
+════════════════════════════════════════ -->
+<div id="auth-overlay">
+  <div class="auth-modal">
+    <button class="auth-close" id="auth-close-btn">✕</button>
+    <div class="auth-logo">
+      <div class="auth-logo-icon">⚡</div>
+      <div class="auth-logo-name">FlowAI</div>
+    </div>
+    <div class="auth-title" id="auth-modal-title">Welcome back</div>
+    <div class="auth-sub" id="auth-modal-sub">Sign in to your workspace to continue</div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</div>
+      <div class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Create Account</div>
+    </div>
+
+    <div class="auth-error" id="auth-error"></div>
+
+    <div class="auth-form">
+      <div class="form-group">
+        <label class="form-label">Email address</label>
+        <input type="email" class="form-input" id="auth-email" placeholder="you@company.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="auth-password" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+      <button class="btn btn-primary auth-submit" id="auth-submit-btn" onclick="handleAuth()">
+        <span id="auth-btn-text">Sign In</span>
+        <span id="auth-btn-loader" style="display:none"><span class="loading-spinner"></span></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     OPENAI KEY MODAL
+════════════════════════════════════════ -->
+<div id="key-modal">
+  <div class="key-modal-inner">
+    <div class="key-modal-title">🤖 Connect AI Assistant</div>
+    <div class="key-modal-sub">Enter your OpenAI API key to enable the AI chat assistant. Your key is stored only in your browser session.</div>
+    <div class="form-group">
+      <label class="form-label">OpenAI API Key</label>
+      <input type="password" class="form-input" id="openai-key-input" placeholder="sk-proj-..." />
+    </div>
+    <div class="key-modal-note">⚡ Get your key from platform.openai.com — Only stored locally in sessionStorage, never sent to any server except OpenAI.</div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="saveOpenAIKey()">Activate AI</button>
+      <button class="btn btn-ghost" onclick="dismissKeyModal()">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     LANDING PAGE
+════════════════════════════════════════ -->
+<div id="landing-page">
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="container">
+    <div class="nav-inner">
+      <a href="#" class="logo">
+        <div class="logo-icon">⚡</div>
+        FlowAI
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#cta">About</a></li>
+      </ul>
+      <div class="nav-cta">
+        <button class="btn btn-ghost" onclick="openAuth('login')">Sign In</button>
+        <button class="btn btn-primary" onclick="openAuth('signup')">Start Free →</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div id="canvas-container">
+    <canvas id="three-canvas"></canvas>
+  </div>
+  <div class="hero-grid-bg"></div>
+  <div class="hero-glow-1"></div>
+  <div class="hero-glow-2"></div>
+  <div class="container">
+    <div class="hero-inner">
+      <div class="hero-content">
+        <div class="hero-tag">
+          <span class="tag">Now in Beta · 12,000+ teams onboard</span>
+        </div>
+        <h1 class="hero-h1">
+          Your second brain
+          <span class="line-2 gradient-text">for getting things done.</span>
+        </h1>
+        <p class="hero-sub">
+          FlowAI fuses <strong>AI-powered intelligence</strong> with a beautiful task board — so you spend less time organizing and more time on work that actually matters.
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary btn-lg" onclick="openAuth('signup')">
+            Get started free →
+          </button>
+          <button class="btn btn-cyan btn-lg" onclick="openAuth('login')">
+            Sign in to workspace
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="stat-item">
+            <div class="stat-num">12K+</div>
+            <div class="stat-label">Teams active</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">2.4M</div>
+            <div class="stat-label">Tasks completed</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">98%</div>
+            <div class="stat-label">Uptime SLA</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-3d">
+        <div class="hero-3d-ring"></div>
+        <div class="hero-3d-ring-2"></div>
+        <canvas id="three-canvas" style="width:100%;height:100%;border-radius:24px;position:absolute;inset:0;"></canvas>
+        <div class="hero-badge">
+          <div class="dot"></div>
+          AI assistant is online · Processing 4,221 tasks
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGOS -->
+<div id="logos">
+  <div class="container">
+    <div class="logos-label">Trusted by teams at</div>
+    <div class="marquee-wrapper">
+      <div class="marquee-track">
+        <span class="marquee-item">Notion</span>
+        <span class="marquee-item">Linear</span>
+        <span class="marquee-item">Vercel</span>
+        <span class="marquee-item">Stripe</span>
+        <span class="marquee-item">Figma</span>
+        <span class="marquee-item">GitHub</span>
+        <span class="marquee-item">Supabase</span>
+        <span class="marquee-item">Loom</span>
+        <span class="marquee-item">Framer</span>
+        <span class="marquee-item">Arc</span>
+        <span class="marquee-item">Notion</span>
+        <span class="marquee-item">Linear</span>
+        <span class="marquee-item">Vercel</span>
+        <span class="marquee-item">Stripe</span>
+        <span class="marquee-item">Figma</span>
+        <span class="marquee-item">GitHub</span>
+        <span class="marquee-item">Supabase</span>
+        <span class="marquee-item">Loom</span>
+        <span class="marquee-item">Framer</span>
+        <span class="marquee-item">Arc</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="features-header">
+      <div class="section-label">Core features</div>
+      <h2 class="section-h2">Everything your team needs to <span class="gradient-text">ship faster</span></h2>
+      <p class="section-sub">One platform that replaces your project manager, AI assistant, and productivity tools — unified in a single beautiful workspace.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card" onmousemove="featureMouseMove(event,this)">
+        <div class="feat-icon icon-cyan">⚡</div>
+        <div class="feat-title">Real-time Task Board</div>
+        <div class="feat-body">Drag-and-drop Kanban board powered by Firebase Firestore. Changes sync instantly across every device and teammate — zero refresh needed.</div>
+      </div>
+      <div class="feat-card" onmousemove="featureMouseMove(event,this)">
+        <div class="feat-icon icon-violet">🤖</div>
+        <div class="feat-title">AI Productivity Assistant</div>
+        <div class="feat-body">Chat with a GPT-4o powered assistant trained on productivity. Break down projects, unblock yourself, and get intelligent suggestions in seconds.</div>
+      </div>
+      <div class="feat-card" onmousemove="featureMouseMove(event,this)">
+        <div class="feat-icon icon-rose">🔐</div>
+        <div class="feat-title">Secure Authentication</div>
+        <div class="feat-body">Firebase Auth keeps your workspace private. Email/password sign-in with persistent sessions. Your data, your space — no one else can see it.</div>
+      </div>
+      <div class="feat-card" onmousemove="featureMouseMove(event,this)">
+        <div class="feat-icon icon-green">📊</div>
+        <div class="feat-title">Live Analytics Dashboard</div>
+        <div class="feat-body">Track velocity, completion rates, and team momentum in real time. Understand exactly where your energy is going — and optimize relentlessly.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="pricing-header">
+      <div class="section-label">Simple pricing</div>
+      <h2 class="section-h2">Scale with your <span class="gradient-text">ambitions</span></h2>
+      <p class="section-sub" style="margin-top:12px;color:var(--muted)">Start free. No credit card required.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card">
+        <div class="price-tier">Starter</div>
+        <div class="price-amount">
+          <div class="price-dollar">$</div>
+          <div class="price-num">0</div>
+          <div class="price-period">/month</div>
+        </div>
+        <div class="price-desc">Perfect for solo makers and small side projects getting off the ground.</div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Up to 50 tasks</li>
+          <li><span class="check">✓</span> AI chat (50 msgs/mo)</li>
+          <li><span class="check">✓</span> 1 workspace</li>
+          <li><span class="cross">✕</span> Team collaboration</li>
+          <li><span class="cross">✕</span> Priority support</li>
+        </ul>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="openAuth('signup')">Get started free</button>
+      </div>
+      <div class="price-card popular">
+        <div class="popular-badge">Most Popular</div>
+        <div class="price-tier">Pro</div>
+        <div class="price-amount">
+          <div class="price-dollar">$</div>
+          <div class="price-num">18</div>
+          <div class="price-period">/month</div>
+        </div>
+        <div class="price-desc">For professionals who need unlimited power and AI at their fingertips.</div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Unlimited tasks</li>
+          <li><span class="check">✓</span> Unlimited AI chat</li>
+          <li><span class="check">✓</span> 5 workspaces</li>
+          <li><span class="check">✓</span> Team collaboration</li>
+          <li><span class="cross">✕</span> Enterprise SSO</li>
+        </ul>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="openAuth('signup')">Start 14-day trial →</button>
+      </div>
+      <div class="price-card">
+        <div class="price-tier">Enterprise</div>
+        <div class="price-amount">
+          <div class="price-dollar">$</div>
+          <div class="price-num">79</div>
+          <div class="price-period">/month</div>
+        </div>
+        <div class="price-desc">For growing teams that need advanced controls and dedicated support.</div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Everything in Pro</li>
+          <li><span class="check">✓</span> Unlimited workspaces</li>
+          <li><span class="check">✓</span> Enterprise SSO</li>
+          <li><span class="check">✓</span> Custom AI models</li>
+          <li><span class="check">✓</span> Dedicated support</li>
+        </ul>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="openAuth('signup')">Contact sales</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="cta-bg"></div>
+  <div class="cta-ring cta-ring-1"></div>
+  <div class="cta-ring cta-ring-2"></div>
+  <div class="container">
+    <div class="cta-inner">
+      <div class="section-label" style="text-align:center;margin-bottom:16px;">Get started today</div>
+      <h2 class="cta-h2">Stop managing work.<br/><span class="gradient-text">Start shipping it.</span></h2>
+      <p class="cta-sub">Join 12,000+ teams using FlowAI to move faster, think clearly, and build things that matter.</p>
+      <div class="cta-actions">
+        <button class="btn btn-primary btn-lg" onclick="openAuth('signup')">Create free workspace →</button>
+        <button class="btn btn-ghost btn-lg" onclick="openAuth('login')">Sign in</button>
+      </div>
+      <div class="cta-note">No credit card required · Free forever plan · Cancel anytime</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand-name">
+          <div class="logo-icon" style="width:28px;height:28px;font-size:14px;">⚡</div>
+          FlowAI
+        </div>
+        <div class="footer-brand-desc">Your second brain for getting things done. AI-powered productivity for modern teams.</div>
+      </div>
+      <div>
+        <div class="footer-col-title">Product</div>
+        <ul class="footer-links">
+          <li><a href="#">Features</a></li>
+          <li><a href="#">Pricing</a></li>
+          <li><a href="#">Changelog</a></li>
+          <li><a href="#">Roadmap</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Company</div>
+        <ul class="footer-links">
+          <li><a href="#">About</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Press</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Legal</div>
+        <ul class="footer-links">
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">Terms</a></li>
+          <li><a href="#">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2024 FlowAI Inc. All rights reserved.</div>
+      <div class="footer-copy">Built with ⚡ for ambitious teams</div>
+    </div>
+  </div>
+</footer>
+
+</div><!-- /landing-page -->
+
+<!-- ════════════════════════════════════════
+     APP SHELL (Main Product)
+════════════════════════════════════════ -->
+<div id="app-shell">
+
+  <!-- TOP BAR -->
+  <div class="app-topbar">
+    <div class="app-topbar-left">
+      <div class="app-logo">
+        <div class="app-logo-icon">⚡</div>
+        FlowAI
+      </div>
+    </div>
+    <div class="app-topbar-center">
+      <input type="text" class="app-search" placeholder="⌕  Search tasks, notes, anything…"/>
+    </div>
+    <div class="app-topbar-right">
+      <button class="btn btn-sm btn-ghost" onclick="showKeyModal()">🤖 AI Config</button>
+      <div class="app-user-badge" id="user-badge">
+        <div class="app-avatar" id="topbar-avatar">U</div>
+        <span id="topbar-email" style="font-size:12px;color:var(--muted);">user@app.com</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-body">
+
+    <!-- SIDEBAR -->
+    <div class="app-sidebar">
+      <div class="sidebar-logo-section">
+        <div class="sidebar-workspace">
+          <div class="workspace-icon">W</div>
+          My Workspace
+        </div>
+      </div>
+
+      <div class="sidebar-nav">
+        <div class="sidebar-section-label">Menu</div>
+        <div class="sidebar-item active" onclick="switchView('dashboard',this)">
+          <span class="sidebar-item-icon">📊</span>
+          Dashboard
+        </div>
+        <div class="sidebar-item" onclick="switchView('tasks',this)">
+          <span class="sidebar-item-icon">✅</span>
+          Task Board
+          <span class="sidebar-item-count" id="task-total-count">0</span>
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:20px;">Workspace</div>
+        <div class="sidebar-item" onclick="showToast('Coming soon!','🚧')">
+          <span class="sidebar-item-icon">📝</span>
+          Notes
+        </div>
+        <div class="sidebar-item" onclick="showToast('Coming soon!','🚧')">
+          <span class="sidebar-item-icon">📅</span>
+          Calendar
+        </div>
+        <div class="sidebar-item" onclick="showToast('Coming soon!','🚧')">
+          <span class="sidebar-item-icon">📁</span>
+          Projects
+        </div>
+        <div class="sidebar-item" onclick="showToast('Coming soon!','🚧')">
+          <span class="sidebar-item-icon">⚙️</span>
+          Settings
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="sidebar-avatar" id="sidebar-avatar">U</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name" id="sidebar-user-name">User</div>
+            <div class="sidebar-user-email" id="sidebar-user-email">user@app.com</div>
+          </div>
+          <button class="sidebar-logout" title="Sign out" onclick="handleSignOut()">↩</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="app-main">
+
+      <!-- DASHBOARD VIEW -->
+      <div class="app-view active" id="view-dashboard">
+        <div class="view-header">
+          <div class="view-title">Good morning 👋</div>
+          <div class="view-subtitle" id="dashboard-greeting">Here's what's happening in your workspace today.</div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">📋 Total Tasks</div>
+            <div class="dash-stat-value" id="stat-total">0</div>
+            <div class="dash-stat-delta">↑ Active workspace</div>
+          </div>
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">🔄 In Progress</div>
+            <div class="dash-stat-value" id="stat-inprogress">0</div>
+            <div class="dash-stat-delta">Being worked on</div>
+          </div>
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">✅ Completed</div>
+            <div class="dash-stat-value" id="stat-done">0</div>
+            <div class="dash-stat-delta" id="stat-done-pct">0% completion rate</div>
+          </div>
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">🔴 High Priority</div>
+            <div class="dash-stat-value" id="stat-high">0</div>
+            <div class="dash-stat-delta">Needs attention</div>
+          </div>
+        </div>
+
+        <div class="dashboard-row">
+          <div class="dash-card">
+            <div class="dash-card-title">Recent Activity <span>Live updates</span></div>
+            <div id="activity-feed">
+              <div class="activity-item">
+                <div class="activity-dot" style="background:var(--violet)"></div>
+                <div>
+                  <div class="activity-text">Welcome to FlowAI! Create your first task to get started.</div>
+                  <div class="activity-time">Just now</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">Quick Actions</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-ghost" style="justify-content:flex-start;font-size:13px;" onclick="switchView('tasks',document.querySelector('.sidebar-item:nth-child(2))'))">
+                ➕ Add new task
+              </button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;font-size:13px;" onclick="focusChatInput()">
+                🤖 Ask AI assistant
+              </button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;font-size:13px;" onclick="showToast('Feature coming soon!','🚀')">
+                📊 View analytics
+              </button>
+              <button class="btn btn-ghost" style="justify-content:flex-start;font-size:13px;" onclick="showToast('Invite link copied!','🔗')">
+                👥 Invite teammate
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TASK BOARD VIEW -->
+      <div class="app-view" id="view-tasks">
+        <div class="board-header">
+          <div class="view-header" style="margin-bottom:0">
+            <div class="view-title">Task Board</div>
+            <div class="view-subtitle">Drag & drop tasks · Changes sync in real-time</div>
+          </div>
+          <div class="board-actions">
+            <button class="btn btn-ghost btn-sm" onclick="showToast('Board exported!','📋')">Export</button>
+            <button class="btn btn-primary btn-sm" onclick="openAddTaskModal()">+ Add Task</button>
+          </div>
+        </div>
+
+        <div class="task-board">
+          <!-- TODO -->
+          <div class="task-column" id="col-todo" ondragover="onDragOver(event)" ondrop="onDrop(event,'todo')" ondragleave="onDragLeave(event)">
+            <div class="col-header">
+              <div class="col-title-row">
+                <div class="col-dot" style="background:#64748b"></div>
+                <div class="col-title">To Do</div>
+                <div class="col-count" id="count-todo">0</div>
+              </div>
+              <button class="col-add-btn" onclick="openInlineAdd('todo')">+</button>
+            </div>
+            <div class="task-list" id="list-todo">
+              <div class="task-empty-state"><div class="task-empty-text">No tasks yet<br/>Click + to add one</div></div>
+            </div>
+            <div class="add-task-form" id="form-todo">
+              <textarea class="add-task-input" id="input-todo" placeholder="What needs to be done?"></textarea>
+              <div class="add-task-actions">
+                <select class="priority-select" id="priority-todo">
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="addTask('todo')">Add</button>
+                <button class="btn btn-ghost btn-sm" onclick="closeInlineAdd('todo')">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- IN PROGRESS -->
+          <div class="task-column" id="col-inprogress" ondragover="onDragOver(event)" ondrop="onDrop(event,'inprogress')" ondragleave="onDragLeave(event)">
+            <div class="col-header">
+              <div class="col-title-row">
+                <div class="col-dot" style="background:#f59e0b"></div>
+                <div class="col-title">In Progress</div>
+                <div class="col-count" id="count-inprogress">0</div>
+              </div>
+              <button class="col-add-btn" onclick="openInlineAdd('inprogress')">+</button>
+            </div>
+            <div class="task-list" id="list-inprogress">
+              <div class="task-empty-state"><div class="task-empty-text">Nothing here yet<br/>Drag tasks from To Do</div></div>
+            </div>
+            <div class="add-task-form" id="form-inprogress">
+              <textarea class="add-task-input" id="input-inprogress" placeholder="What are you working on?"></textarea>
+              <div class="add-task-actions">
+                <select class="priority-select" id="priority-inprogress">
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="addTask('inprogress')">Add</button>
+                <button class="btn btn-ghost btn-sm" onclick="closeInlineAdd('inprogress')">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- DONE -->
+          <div class="task-column" id="col-done" ondragover="onDragOver(event)" ondrop="onDrop(event,'done')" ondragleave="onDragLeave(event)">
+            <div class="col-header">
+              <div class="col-title-row">
+                <div class="col-dot" style="background:#10b981"></div>
+                <div class="col-title">Done</div>
+                <div class="col-count" id="count-done">0</div>
+              </div>
+              <button class="col-add-btn" onclick="openInlineAdd('done')">+</button>
+            </div>
+            <div class="task-list" id="list-done">
+              <div class="task-empty-state"><div class="task-empty-text">Complete a task<br/>to see it here 🎉</div></div>
+            </div>
+            <div class="add-task-form" id="form-done">
+              <textarea class="add-task-input" id="input-done" placeholder="Add a completed task..."></textarea>
+              <div class="add-task-actions">
+                <select class="priority-select" id="priority-done">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="addTask('done')">Add</button>
+                <button class="btn btn-ghost btn-sm" onclick="closeInlineAdd('done')">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /app-main -->
+
+    <!-- AI CHAT PANEL -->
+    <div class="app-chat-panel">
+      <div class="chat-header">
+        <div class="chat-header-info">
+          <div class="chat-ai-avatar">🤖</div>
+          <div>
+            <div class="chat-ai-name">Flow Assistant</div>
+            <div class="chat-ai-status">Online · GPT-4o</div>
+          </div>
+        </div>
+        <button class="chat-toggle" onclick="clearChat()" title="Clear chat">🗑</button>
+      </div>
+
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-message">
+          <div class="msg-avatar ai">🤖</div>
+          <div class="msg-bubble ai">
+            Hi! I'm your AI productivity assistant. I can help you break down tasks, prioritize your work, and keep you in flow. What are we building today?
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-typing" id="chat-typing">
+        <div class="msg-avatar ai">🤖</div>
+        <div class="typing-dots">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-row">
+          <textarea class="chat-textarea" id="chat-input" placeholder="Ask anything about your tasks…" rows="1" onkeydown="chatKeyDown(event)"></textarea>
+          <button class="chat-send" id="chat-send-btn" onclick="sendChatMessage()">↑</button>
+        </div>
+        <div class="chat-hint">Enter to send · Shift+Enter for newline</div>
+      </div>
+    </div>
+
+  </div><!-- /app-body -->
+</div><!-- /app-shell -->
+
+
+<!-- ════════════════════════════════════════
+     THREE.JS HERO SCENE
+════════════════════════════════════════ -->
+<script>
+(function initThree() {
+  const canvas = document.getElementById('three-canvas');
+  if (!canvas || typeof THREE === 'undefined') return;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const W = canvas.parentElement.clientWidth || 500;
+  const H = canvas.parentElement.clientHeight || 520;
+  renderer.setSize(W, H);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 100);
+  camera.position.z = 4;
+
+  // Orb
+  const orbGeo = new THREE.IcosahedronGeometry(1, 4);
+  const orbMat = new THREE.MeshPhongMaterial({
+    color: 0x0d1b2a, emissive: 0x1a0533, specular: 0x7c3aed,
+    shininess: 80, transparent: true, opacity: 0.9, wireframe: false
+  });
+  const orb = new THREE.Mesh(orbGeo, orbMat);
+  scene.add(orb);
+
+  const wireGeo = new THREE.IcosahedronGeometry(1.01, 2);
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x7c3aed, wireframe: true, transparent: true, opacity: 0.15 });
+  const wire = new THREE.Mesh(wireGeo, wireMat);
+  scene.add(wire);
+
+  const glowGeo = new THREE.SphereGeometry(1.3, 32, 32);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0x6d28d9, transparent: true, opacity: 0.05, side: THREE.BackSide });
+  scene.add(new THREE.Mesh(glowGeo, glowMat));
+
+  const partCount = 800;
+  const partGeo = new THREE.BufferGeometry();
+  const partPos = new Float32Array(partCount * 3);
+  for (let i = 0; i < partCount; i++) {
+    const r = 1.6 + Math.random() * 1.2;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    partPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    partPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    partPos[i*3+2] = r * Math.cos(phi);
+  }
+  partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+  const partMat = new THREE.PointsMaterial({ size: 0.02, color: 0x00f0ff, transparent: true, opacity: 0.6, sizeAttenuation: true });
+  const particles = new THREE.Points(partGeo, partMat);
+  scene.add(particles);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.5, 0.008, 2, 120),
+    new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.35 })
+  );
+  ring.rotation.x = Math.PI / 2.5;
+  scene.add(ring);
+
+  const ring2 = new THREE.Mesh(
+    new THREE.TorusGeometry(1.78, 0.004, 2, 120),
+    new THREE.MeshBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.2 })
+  );
+  ring2.rotation.x = Math.PI / 3;
+  ring2.rotation.z = Math.PI / 6;
+  scene.add(ring2);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+  const pL1 = new THREE.PointLight(0x7c3aed, 3, 8);
+  pL1.position.set(2, 2, 2); scene.add(pL1);
+  const pL2 = new THREE.PointLight(0x00f0ff, 2, 8);
+  pL2.position.set(-2, -1, 2); scene.add(pL2);
+  const pL3 = new THREE.PointLight(0xf43f5e, 1.5, 6);
+  pL3.position.set(0, -3, -1); scene.add(pL3);
+
+  let mouseX = 0, mouseY = 0;
+  document.addEventListener('mousemove', e => {
+    mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+    mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
+  });
+
+  let t = 0;
+  (function animate() {
+    requestAnimationFrame(animate);
+    t += 0.008;
+    orb.rotation.y = t * 0.3 + mouseX * 0.3;
+    orb.rotation.x = Math.sin(t * 0.2) * 0.15 + mouseY * 0.2;
+    wire.rotation.y = t * 0.3 + mouseX * 0.3;
+    wire.rotation.x = Math.sin(t * 0.2) * 0.15 + mouseY * 0.2;
+    particles.rotation.y = t * 0.08;
+    particles.rotation.x = t * 0.04;
+    ring.rotation.z = t * 0.5;
+    ring2.rotation.y = t * 0.3;
+    pL1.intensity = 2.5 + Math.sin(t * 1.2) * 0.8;
+    pL2.intensity = 1.8 + Math.cos(t * 0.9) * 0.6;
+    camera.position.x += (mouseX * 0.2 - camera.position.x) * 0.03;
+    camera.position.y += (mouseY * 0.2 - camera.position.y) * 0.03;
+    camera.lookAt(scene.position);
+    renderer.render(scene, camera);
+  })();
+
+  window.addEventListener('resize', () => {
+    const W2 = canvas.parentElement.clientWidth;
+    const H2 = canvas.parentElement.clientHeight;
+    renderer.setSize(W2, H2);
+    camera.aspect = W2 / H2;
+    camera.updateProjectionMatrix();
+  });
+})();
+</script>
+
+<!-- ════════════════════════════════════════
+     GSAP SCROLL ANIMATIONS
+════════════════════════════════════════ -->
+<script>
+if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+
+  gsap.fromTo('#hero .hero-h1', { y: 0 }, {
+    y: -60, ease: 'none',
+    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true }
+  });
+  gsap.fromTo('.hero-glow-1', { scale: 1 }, {
+    scale: 1.4, rotate: 30, ease: 'none',
+    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true }
+  });
+
+  gsap.utils.toArray('.feat-card').forEach((card, i) => {
+    gsap.fromTo(card, { opacity: 0, y: 40 }, {
+      opacity: 1, y: 0, duration: 0.7, delay: i * 0.1, ease: 'power3.out',
+      scrollTrigger: { trigger: card, start: 'top 85%' }
+    });
+  });
+
+  gsap.utils.toArray('.price-card').forEach((card, i) => {
+    gsap.fromTo(card, { opacity: 0, y: 30 }, {
+      opacity: 1, y: 0, duration: 0.6, delay: i * 0.12, ease: 'power3.out',
+      scrollTrigger: { trigger: card, start: 'top 85%' }
+    });
+  });
+}
+</script>
+
+<!-- ════════════════════════════════════════
+     NAV SCROLL + FEATURE HOVER
+════════════════════════════════════════ -->
+<script>
+window.addEventListener('scroll', () => {
+  const nav = document.getElementById('nav');
+  if (nav) nav.classList.toggle('scrolled', window.scrollY > 50);
+});
+
+function featureMouseMove(e, card) {
+  const rect = card.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 100;
+  const my = ((e.clientY - rect.top) / rect.height) * 100;
+  card.style.setProperty('--mx', mx + '%');
+  card.style.setProperty('--my', my + '%');
+}
+</script>
+
+<!-- ════════════════════════════════════════
+     TOAST SYSTEM
+════════════════════════════════════════ -->
+<script>
+function showToast(message, icon = '✅', type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  requestAnimationFrame(() => { requestAnimationFrame(() => { toast.classList.add('show'); }); });
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
+}
+</script>
+
+<!-- ════════════════════════════════════════
+     AUTH LOGIC
+════════════════════════════════════════ -->
+<script>
+let currentAuthMode = 'login';
+
+function openAuth(mode) {
+  currentAuthMode = mode;
+  const overlay = document.getElementById('auth-overlay');
+  overlay.classList.add('visible');
+  switchAuthTab(mode);
+}
+
+function closeAuth() {
+  document.getElementById('auth-overlay').classList.remove('visible');
+}
+
+document.getElementById('auth-close-btn').addEventListener('click', closeAuth);
+document.getElementById('auth-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('auth-overlay')) closeAuth();
+});
+
+function switchAuthTab(mode) {
+  currentAuthMode = mode;
+  document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+  document.getElementById('auth-modal-title').textContent = mode === 'login' ? 'Welcome back' : 'Create your account';
+  document.getElementById('auth-modal-sub').textContent = mode === 'login' ? 'Sign in to your workspace to continue' : 'Join 12,000+ teams building faster with FlowAI';
+  document.getElementById('auth-btn-text').textContent = mode === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-error').classList.remove('show');
+}
+
+async function handleAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  const btnText = document.getElementById('auth-btn-text');
+  const btnLoader = document.getElementById('auth-btn-loader');
+
+  if (!email || !password) { showAuthError('Please fill in all fields.'); return; }
+  if (password.length < 6) { showAuthError('Password must be at least 6 characters.'); return; }
+
+  btnText.style.display = 'none';
+  btnLoader.style.display = 'inline-flex';
+  errEl.classList.remove('show');
+
+  // Check if Firebase is loaded
+  if (!window._firebase) {
+    // Simulate auth for demo (Firebase not configured)
+    setTimeout(() => {
+      btnText.style.display = '';
+      btnLoader.style.display = 'none';
+      window._demoUser = { email, uid: 'demo-' + Date.now() };
+      onUserSignedIn(window._demoUser);
+      showToast('Signed in (Demo Mode — configure Firebase for real auth)', '⚡');
+    }, 800);
+    return;
+  }
+
+  try {
+    const { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } = window._firebase;
+    if (currentAuthMode === 'signup') {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+  } catch (err) {
+    btnText.style.display = '';
+    btnLoader.style.display = 'none';
+    const msg = err.code === 'auth/user-not-found' ? 'No account found with this email.' :
+                err.code === 'auth/wrong-password' ? 'Incorrect password.' :
+                err.code === 'auth/email-already-in-use' ? 'An account with this email already exists.' :
+                err.code === 'auth/invalid-email' ? 'Invalid email address.' :
+                err.message;
+    showAuthError(msg);
+  }
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+document.getElementById('auth-password').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleAuth();
+});
+</script>
+
+<!-- ════════════════════════════════════════
+     FIREBASE AUTH STATE + APP INIT
+════════════════════════════════════════ -->
+<script type="module">
+  // Wait for firebase to be available
+  function waitForFirebase(cb, attempts = 0) {
+    if (window._firebase) { cb(); return; }
+    if (attempts > 30) { // Firebase not configured, run in demo mode
+      initDemoMode();
+      return;
+    }
+    setTimeout(() => waitForFirebase(cb, attempts + 1), 200);
+  }
+
+  function initDemoMode() {
+    // No Firebase configured — show landing only, auth will be demo
+    console.log('FlowAI running in demo mode. Configure Firebase for full functionality.');
+  }
+
+  waitForFirebase(() => {
+    const { auth, onAuthStateChanged } = window._firebase;
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        window.onUserSignedIn(user);
+      } else {
+        window.onUserSignedOut();
+      }
+    });
+  });
+</script>
+
+<!-- ════════════════════════════════════════
+     APP CORE LOGIC
+════════════════════════════════════════ -->
+<script>
+let currentUser = null;
+let tasksUnsubscribe = null;
+let allTasks = [];
+let draggedTaskId = null;
+
+function onUserSignedIn(user) {
+  currentUser = user;
+  closeAuth();
+
+  // Update UI
+  const email = user.email || 'user@app.com';
+  const initial = email.charAt(0).toUpperCase();
+  document.getElementById('topbar-avatar').textContent = initial;
+  document.getElementById('topbar-email').textContent = email;
+  document.getElementById('sidebar-avatar').textContent = initial;
+  document.getElementById('sidebar-user-name').textContent = email.split('@')[0];
+  document.getElementById('sidebar-user-email').textContent = email;
+
+  // Set greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.querySelector('#view-dashboard .view-title').textContent = `${greeting}, ${email.split('@')[0]} 👋`;
+
+  // Show app
+  document.getElementById('landing-page').style.display = 'none';
+  document.getElementById('app-shell').classList.add('visible');
+
+  showToast('Welcome to FlowAI!', '⚡');
+
+  // Subscribe to tasks
+  subscribeToTasks();
+
+  // Prompt for OpenAI key if not set
+  if (!sessionStorage.getItem('openai_key')) {
+    setTimeout(() => showKeyModal(), 1500);
+  }
+}
+
+function onUserSignedOut() {
+  currentUser = null;
+  if (tasksUnsubscribe) { tasksUnsubscribe(); tasksUnsubscribe = null; }
+  allTasks = [];
+  document.getElementById('landing-page').style.display = '';
+  document.getElementById('app-shell').classList.remove('visible');
+}
+
+function handleSignOut() {
+  if (window._firebase) {
+    const { auth, signOut } = window._firebase;
+    signOut(auth).then(() => {
+      showToast('Signed out successfully', '👋');
+    });
+  } else if (window._demoUser) {
+    window._demoUser = null;
+    onUserSignedOut();
+    showToast('Signed out', '👋');
+  }
+}
+
+// ── TASK BOARD ──────────────────────────────────────────
+function subscribeToTasks() {
+  if (!currentUser) return;
+
+  if (window._firebase) {
+    const { db, collection, query, where, onSnapshot, orderBy } = window._firebase;
+    const q = query(
+      collection(db, 'tasks'),
+      where('uid', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+    tasksUnsubscribe = onSnapshot(q, (snapshot) => {
+      allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderBoard();
+      updateStats();
+    }, (err) => {
+      console.error('Firestore error:', err);
+      showToast('Firestore error — check rules/indexes', '⚠️', 'error');
+    });
+  } else {
+    // Demo mode — use localStorage
+    const stored = localStorage.getItem('flowai_tasks_demo');
+    allTasks = stored ? JSON.parse(stored) : getSampleTasks();
+    renderBoard();
+    updateStats();
+  }
+}
+
+function getSampleTasks() {
+  return [
+    { id: 'demo1', title: 'Design new onboarding flow', status: 'todo', priority: 'high', createdAt: { seconds: Date.now()/1000 } },
+    { id: 'demo2', title: 'Write Q4 product brief', status: 'todo', priority: 'medium', createdAt: { seconds: Date.now()/1000 } },
+    { id: 'demo3', title: 'Integrate Stripe payments', status: 'inprogress', priority: 'high', createdAt: { seconds: Date.now()/1000 } },
+    { id: 'demo4', title: 'Fix mobile navigation bug', status: 'inprogress', priority: 'medium', createdAt: { seconds: Date.now()/1000 } },
+    { id: 'demo5', title: 'Set up CI/CD pipeline', status: 'done', priority: 'low', createdAt: { seconds: Date.now()/1000 } },
+  ];
+}
+
+function saveDemoTasks() {
+  localStorage.setItem('flowai_tasks_demo', JSON.stringify(allTasks));
+}
+
+async function addTask(status) {
+  const input = document.getElementById(`input-${status}`);
+  const priority = document.getElementById(`priority-${status}`).value;
+  const title = input.value.trim();
+  if (!title) return;
+
+  input.value = '';
+  closeInlineAdd(status);
+
+  if (window._firebase && currentUser && !currentUser.uid.startsWith('demo-')) {
+    const { db, collection, addDoc, serverTimestamp } = window._firebase;
+    try {
+      await addDoc(collection(db, 'tasks'), {
+        title, status, priority,
+        uid: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+      showToast('Task added!', '✅');
+      addActivityItem(`New task added: "${title.substring(0, 40)}${title.length > 40 ? '…' : ''}"`);
+    } catch(err) {
+      showToast('Failed to add task', '⚠️', 'error');
+    }
+  } else {
+    // Demo mode
+    const task = {
+      id: 'task-' + Date.now(),
+      title, status, priority,
+      uid: currentUser?.uid || 'demo',
+      createdAt: { seconds: Date.now()/1000 }
+    };
+    allTasks.unshift(task);
+    saveDemoTasks();
+    renderBoard();
+    updateStats();
+    showToast('Task added!', '✅');
+    addActivityItem(`New task: "${title.substring(0, 40)}"`);
+  }
+}
+
+async function deleteTask(taskId) {
+  if (window._firebase && currentUser && !currentUser.uid?.startsWith('demo-')) {
+    const { db, doc, deleteDoc } = window._firebase;
+    try {
+      await deleteDoc(doc(db, 'tasks', taskId));
+      showToast('Task deleted', '🗑');
+    } catch(err) {
+      showToast('Failed to delete', '⚠️', 'error');
+    }
+  } else {
+    allTasks = allTasks.filter(t => t.id !== taskId);
+    saveDemoTasks();
+    renderBoard();
+    updateStats();
+    showToast('Task deleted', '🗑');
+  }
+}
+
+async function moveTask(taskId, newStatus) {
+  if (window._firebase && currentUser && !currentUser.uid?.startsWith('demo-')) {
+    const { db, doc, updateDoc } = window._firebase;
+    try {
+      await updateDoc(doc(db, 'tasks', taskId), { status: newStatus });
+      if (newStatus === 'done') showToast('Task completed! 🎉', '✅');
+    } catch(err) {
+      showToast('Failed to update', '⚠️', 'error');
+    }
+  } else {
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+      task.status = newStatus;
+      saveDemoTasks();
+      renderBoard();
+      updateStats();
+      if (newStatus === 'done') showToast('Task completed! 🎉', '✅');
+    }
+  }
+}
+
+function renderBoard() {
+  ['todo', 'inprogress', 'done'].forEach(status => {
+    const list = document.getElementById(`list-${status}`);
+    const tasks = allTasks.filter(t => t.status === status);
+    document.getElementById(`count-${status}`).textContent = tasks.length;
+
+    if (tasks.length === 0) {
+      const emptyTexts = {
+        todo: 'No tasks yet<br/>Click + to add one',
+        inprogress: 'Nothing here yet<br/>Drag tasks from To Do',
+        done: 'Complete a task<br/>to see it here 🎉'
+      };
+      list.innerHTML = `<div class="task-empty-state"><div class="task-empty-text">${emptyTexts[status]}</div></div>`;
+      return;
+    }
+
+    list.innerHTML = tasks.map(task => `
+      <div class="task-card" draggable="true"
+           ondragstart="onDragStart(event,'${task.id}')"
+           ondragend="onDragEnd(event)"
+           id="task-${task.id}">
+        <div class="task-card-title">${escapeHtml(task.title)}</div>
+        <div class="task-card-meta">
+          <span class="task-priority priority-${task.priority}">
+            ${ task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : '🟢' }
+            ${task.priority}
+          </span>
+        </div>
+        <button class="task-delete" onclick="deleteTask('${task.id}')" title="Delete task">✕</button>
+      </div>
+    `).join('');
+  });
+
+  // Update total count badge in sidebar
+  document.getElementById('task-total-count').textContent = allTasks.length;
+}
+
+function updateStats() {
+  const total = allTasks.length;
+  const inprogress = allTasks.filter(t => t.status === 'inprogress').length;
+  const done = allTasks.filter(t => t.status === 'done').length;
+  const high = allTasks.filter(t => t.priority === 'high').length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-inprogress').textContent = inprogress;
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-high').textContent = high;
+  document.getElementById('stat-done-pct').textContent = `${pct}% completion rate`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+// ── DRAG & DROP ──────────────────────────────────────────
+function onDragStart(e, taskId) {
+  draggedTaskId = taskId;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => {
+    const el = document.getElementById(`task-${taskId}`);
+    if (el) el.classList.add('dragging');
+  }, 0);
+}
+
+function onDragEnd(e) {
+  if (draggedTaskId) {
+    const el = document.getElementById(`task-${draggedTaskId}`);
+    if (el) el.classList.remove('dragging');
+  }
+  document.querySelectorAll('.task-column').forEach(col => col.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const col = e.currentTarget;
+  col.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onDrop(e, status) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (draggedTaskId) {
+    moveTask(draggedTaskId, status);
+    draggedTaskId = null;
+  }
+}
+
+// ── ADD TASK UI ──────────────────────────────────────────
+function openInlineAdd(status) {
+  document.getElementById(`form-${status}`).classList.add('show');
+  document.getElementById(`input-${status}`).focus();
+}
+
+function closeInlineAdd(status) {
+  document.getElementById(`form-${status}`).classList.remove('show');
+  document.getElementById(`input-${status}`).value = '';
+}
+
+function openAddTaskModal() {
+  openInlineAdd('todo');
+  switchView('tasks', document.querySelector('.sidebar-item:nth-child(2)'));
+}
+
+// ── NAVIGATION ──────────────────────────────────────────
+function switchView(viewName, el) {
+  document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById(`view-${viewName}`)?.classList.add('active');
+  if (el && el.classList) el.classList.add('active');
+}
+
+// ── ACTIVITY FEED ──────────────────────────────────────────
+function addActivityItem(text) {
+  const feed = document.getElementById('activity-feed');
+  const colors = ['var(--violet)', 'var(--cyan)', 'var(--green)', 'var(--rose)'];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const item = document.createElement('div');
+  item.className = 'activity-item';
+  item.innerHTML = `
+    <div class="activity-dot" style="background:${color}"></div>
+    <div>
+      <div class="activity-text">${escapeHtml(text)}</div>
+      <div class="activity-time">${time}</div>
+    </div>
+  `;
+  feed.insertBefore(item, feed.firstChild);
+  // Keep max 8 items
+  while (feed.children.length > 8) feed.removeChild(feed.lastChild);
+}
+</script>
+
+<!-- ════════════════════════════════════════
+     OPENAI CHAT
+════════════════════════════════════════ -->
+<script>
+let chatHistory = [
+  { role: 'system', content: `You are Flow, an expert AI productivity assistant embedded in FlowAI — a Notion/Linear-style task management platform. Your job is to help users: (1) Break down complex projects into actionable tasks, (2) Prioritize their work, (3) Identify blockers and suggest solutions, (4) Stay motivated and in flow. Be concise, direct, and energizing. Use occasional emojis but not excessively. Respond in 2-4 sentences unless asked for detail.` }
+];
+
+function showKeyModal() {
+  document.getElementById('key-modal').classList.add('visible');
+}
+
+function dismissKeyModal() {
+  document.getElementById('key-modal').classList.remove('visible');
+}
+
+function saveOpenAIKey() {
+  const key = document.getElementById('openai-key-input').value.trim();
+  if (!key || !key.startsWith('sk-')) {
+    showToast('Please enter a valid OpenAI key (starts with sk-)', '⚠️', 'error');
+    return;
+  }
+  sessionStorage.setItem('openai_key', key);
+  dismissKeyModal();
+  showToast('AI assistant activated!', '🤖');
+  document.querySelector('.chat-ai-status').textContent = 'Online · GPT-4o';
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const message = input.value.trim();
+  if (!message) return;
+
+  const apiKey = sessionStorage.getItem('openai_key');
+  if (!apiKey) {
+    showKeyModal();
+    return;
+  }
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  appendChatMessage('user', message);
+  chatHistory.push({ role: 'user', content: message });
+
+  document.getElementById('chat-send-btn').disabled = true;
+  document.getElementById('chat-typing').classList.add('visible');
+  scrollChatToBottom();
+
+  // Add task context to the message
+  const taskContext = allTasks.length > 0
+    ? `\n\n[User's current tasks: Todo: ${allTasks.filter(t=>t.status==='todo').length}, In Progress: ${allTasks.filter(t=>t.status==='inprogress').length}, Done: ${allTasks.filter(t=>t.status==='done').length}]`
+    : '';
+
+  const messages = [
+    chatHistory[0],
+    ...chatHistory.slice(1).map((m, i) => i === chatHistory.length - 2 ? {...m, content: m.content + taskContext} : m)
+  ];
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        max_tokens: 400,
+        temperature: 0.7,
+        stream: false
+      })
+    });
+
+    document.getElementById('chat-typing').classList.remove('visible');
+    document.getElementById('chat-send-btn').disabled = false;
+
+    if (!response.ok) {
+      const err = await response.json();
+      if (err.error?.code === 'invalid_api_key') {
+        sessionStorage.removeItem('openai_key');
+        showToast('Invalid API key — please re-enter', '⚠️', 'error');
+        showKeyModal();
+      } else {
+        throw new Error(err.error?.message || 'OpenAI API error');
+      }
+      return;
+    }
+
+    const data = await response.json();
+    const aiReply = data.choices[0].message.content;
+    chatHistory.push({ role: 'assistant', content: aiReply });
+
+    // Keep history manageable
+    if (chatHistory.length > 20) chatHistory = [chatHistory[0], ...chatHistory.slice(-18)];
+
+    appendChatMessage('ai', aiReply);
+
+  } catch(err) {
+    document.getElementById('chat-typing').classList.remove('visible');
+    document.getElementById('chat-send-btn').disabled = false;
+    appendChatMessage('ai', `Sorry, I couldn't connect to the AI. Please check your API key and try again. (${err.message})`);
+  }
+}
+
+function appendChatMessage(role, text) {
+  const container = document.getElementById('chat-messages');
+  const msg = document.createElement('div');
+  msg.className = `chat-message ${role}`;
+
+  const avatar = role === 'ai'
+    ? `<div class="msg-avatar ai">🤖</div>`
+    : `<div class="msg-avatar user">${(currentUser?.email || 'U').charAt(0).toUpperCase()}</div>`;
+
+  const formattedText = text.replace(/\n/g, '<br/>');
+  const bubble = `<div class="msg-bubble ${role}">${formattedText}</div>`;
+
+  msg.innerHTML = role === 'ai' ? `${avatar}${bubble}` : `${bubble}${avatar}`;
+  container.insertBefore(msg, document.getElementById('chat-typing'));
+  scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
+  const container = document.getElementById('chat-messages');
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+function chatKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+  // Auto-resize textarea
+  const ta = e.target;
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 100) + 'px';
+}
+
+function clearChat() {
+  chatHistory = [chatHistory[0]]; // keep system prompt
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = `
+    <div class="chat-message">
+      <div class="msg-avatar ai">🤖</div>
+      <div class="msg-bubble ai">Chat cleared. What can I help you focus on?</div>
+    </div>
+  `;
+  container.appendChild(document.getElementById('chat-typing'));
+}
+
+function focusChatInput() {
+  document.getElementById('chat-input').focus();
+}
+</script>
+
+<!-- ════════════════════════════════════════
+     SETUP NOTES (visible in source)
+════════════════════════════════════════ -->
+<!--
+══════════════════════════════════════════════════════════════════
+  FLOWAI — SETUP INSTRUCTIONS
+══════════════════════════════════════════════════════════════════
+
+  1. FIREBASE SETUP
+  ─────────────────
+  a) Go to console.firebase.google.com
+  b) Create a new project
+  c) Add a Web app, copy your firebaseConfig
+  d) Replace the firebaseConfig object at the top of this file
+  e) Enable Authentication → Email/Password provider
+  f) Enable Firestore Database → Start in test mode (or production rules below)
+
+  FIRESTORE SECURITY RULES:
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /tasks/{taskId} {
+        allow read, write: if request.auth != null && resource.data.uid == request.auth.uid;
+        allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      }
+    }
+  }
+
+  FIRESTORE INDEX REQUIRED:
+  Collection: tasks
+  Fields: uid (ASC), createdAt (DESC)
+  Create at: console.firebase.google.com → Firestore → Indexes
+
+  2. OPENAI SETUP
+  ───────────────
+  a) Go to platform.openai.com/api-keys
+  b) Create a new secret key
+  c) In the app, click "AI Config" in the top bar
+  d) Enter your key (stored in sessionStorage, never transmitted to any server except OpenAI)
+
+  3. DEMO MODE
+  ────────────
+  Without Firebase config, the app runs in demo mode:
+  - Auth is simulated (any email/password works)
+  - Tasks are stored in localStorage
+  - OpenAI chat still works with a real API key
+
+══════════════════════════════════════════════════════════════════
+-->
+
+</body>
+</html>
